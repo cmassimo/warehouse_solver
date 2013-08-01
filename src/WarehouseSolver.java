@@ -13,18 +13,6 @@ import choco.kernel.solver.Solver;
 import choco.cp.solver.CPSolver;
 
 public class WarehouseSolver {
-	
-	public static boolean location_kind(int location, int[] kind) {
-		boolean found = false;
-		int i = 0;
-		
-		while (!found && i < kind.length) {
-			found = kind[i] == location;
-			i++;
-		}
-		
-		return found;
-	}
 
 	public static void main(String[] args) {
 		//constants of the problem:
@@ -33,27 +21,53 @@ public class WarehouseSolver {
 		int m = 5;
 		// numero di location disponibili
 		int k = 12;
-		// location vicine
-		int[] T1 = new int[]{1,2,4,5,7,8,10,11};
-		// location opposte
-		int[] T2 = new int[]{1,2,3,7,8,9};
-		// location backside
-		int[] T3 = new int[]{4,5,6,10,11,12};
 		// capacita` delle location
-		int[] Cap = new int[]{5,5,5,5,5,5,5,5,5,5,5,5};
-		// unita` di prodotto disponibili
-		int[] s = new int[]{9,8,10,9,15};
-		// dimensione del singolo box di prodotto (in unita`)
-		int[] b = new int[]{3,2,5,3,5};
+		int[] slots_volumes = new int[k];
+		int[] slots_loads = new int[k];
+ 		// unita` di prodotto disponibili
+		int[] boxes_volumes = new int[m];
+		int[] boxes_weights = new int[m];
 		
-		// penalita` per posizionamento location vicine
-		float c1 = 0.01f;
-		// penalita` per posizionamento location opposte
-		float c2 = 0.013f;
-		// penalita` per posizionamento location backside
-		float c3 = 0.05f;
-		// penalita` per posizionamento location qualsiasi
-		float c4 = 0.1f;
+		int[] boxes_per_goods = new int[m];
+		
+		// init volumi slot
+		String vols = new String();
+		String loads = new String();
+		for(int j = 0; j < k; j++) {
+			slots_volumes[j] = 1 + (int)(Math.random() * ((100 - 1) + 1));
+			vols += Integer.toString(slots_volumes[j]) + " ";
+			slots_loads[j] = 1 + (int)(Math.random() * ((70 - 1) + 1));
+			loads += Integer.toString(slots_loads[j]) + " ";
+		}
+		System.out.println("Volumi slot:  " + vols);
+		System.out.println("Carichi slot: " + loads);
+		
+		// init volumi slot
+		String vols1 = new String();
+		String loads1 = new String();
+		String qt = new String();
+		for(int i = 0; i < m; i++) {
+			boxes_volumes[i] = 1 + (int)(Math.random() * ((60 - 1) + 1));
+			vols1 += Integer.toString(boxes_volumes[i]) + " ";
+			boxes_weights[i] = 1 + (int)(Math.random() * ((50 - 1) + 1));
+			loads1 += Integer.toString(boxes_weights[i]) + " ";
+			boxes_per_goods[i] = 1 + (int)(Math.random() * ((5 - 1) + 1));
+			qt += Integer.toString(boxes_per_goods[i]) + " ";
+		}
+		System.out.println("Volumi box:   " + vols1);
+		System.out.println("Carichi box:  " + loads1);
+		System.out.println("# box:        " + qt);
+		System.out.println();
+		System.out.println();
+		
+//		// penalita` per posizionamento location vicine
+//		float c1 = 0.01f;
+//		// penalita` per posizionamento location opposte
+//		float c2 = 0.013f;
+//		// penalita` per posizionamento location backside
+//		float c3 = 0.05f;
+//		// penalita` per posizionamento location qualsiasi
+//		float c4 = 0.1f;
 		
 		// Our model
 		Model model = new CPModel();
@@ -62,68 +76,24 @@ public class WarehouseSolver {
 		IntegerVariable[][] ys = new IntegerVariable[m][k];
 		for(int i = 0; i < m; i++){
 			for(int j = 0; j < k; j++){
-				ys[i][j] = Choco.makeIntVar(("y"+i)+j, 0, (s[i]/b[i]));
+				ys[i][j] = Choco.makeIntVar("y_"+i+"_"+j, 0, (boxes_per_goods[i]));
 				model.addVariables(ys[i][j]);
 			}
 		}
-
-		// x_i,j: 1 se qualche box della merce i sta in location j
-		IntegerVariable[][] xs = new IntegerVariable[m][k];
-		for(int i = 0; i < m; i++){
-			for(int j = 0; j < k; j++){
-				xs[i][j] = Choco.makeIntVar(("x"+i)+j, 0, 1);
-//				model.addConstraints(Choco.reifiedConstraint(
-//						xs[i][j],
-//						Choco.and(Choco.gt(ys[i][j], 0), Choco.eq(Choco.mod(ys[i][j], b[i]), 0)))
-//				);
+		
+		IntegerVariable[][] vol_ys = new IntegerVariable[k][m];
+		for(int j = 0; j < k; j++){
+			for(int i = 0; i < m; i++){
+				vol_ys[j][i] = Choco.makeIntVar(("vol_y"+j)+i, 0, (slots_volumes[j]));
+				model.addVariables(vol_ys[j][i]);
 			}
 		}
 		
-		// p1_i,j: 1 se il prodotto i e` in location j e j e` adiacente (sta in T1)
-		IntegerVariable[][] p1 = new IntegerVariable[m][k];
-		for(int i = 0; i < m; i++){
-			for(int j = 0; j < k; j++){
-				p1[i][j] = Choco.makeIntVar(("p1"+i)+j, 0, 1);
-//				model.addConstraints(Choco.reifiedConstraint(
-//						p1[i][j],
-//						Choco.and(
-//								Choco.and(Choco.gt(ys[i][j], 0), Choco.eq(Choco.mod(ys[i][j], b[i]), 0)),
-//								Choco.eq(location_kind(j,T1), true)
-//								)
-//						)
-//				);
-			}
-		}
-		
-		// p2_i,j: 1 se il prodotto i e` in location j e j e` opposta (sta in T2)
-		IntegerVariable[][] p2 = new IntegerVariable[m][k];
-		for(int i = 0; i < m; i++){
-			for(int j = 0; j < k; j++){
-				p2[i][j] = Choco.makeIntVar(("p2"+i)+j, 0, 1);
-			}
-		}
-		
-		// p3_i,j: 1 se il prodotto i e` in location j e j e` backside (sta in T3)
-		IntegerVariable[][] p3 = new IntegerVariable[m][k];
-		for(int i = 0; i < m; i++){
-			for(int j = 0; j < k; j++){
-				p3[i][j] = Choco.makeIntVar(("p3"+i)+j, 0, 1);
-			}
-		}
-		
-		// p4_i,j: 1 se il prodotto i e` in location j e j non ricade nei casi precedenti
-		IntegerVariable[][] p4 = new IntegerVariable[m][k];
-		for(int i = 0; i < m; i++){
-			for(int j = 0; j < k; j++){
-				p4[i][j] = Choco.makeIntVar(("p4"+i)+j, 0, 1);
-			}
-		}
-		
-		// p5_i,j: 1 se il prodotto i e` solo in location j
-		IntegerVariable[][] p5 = new IntegerVariable[m][k];
-		for(int i = 0; i < m; i++){
-			for(int j = 0; j < k; j++){
-				p5[i][j] = Choco.makeIntVar(("p5"+i)+j, 0, 1);
+		IntegerVariable[][] weight_ys = new IntegerVariable[k][m];
+		for(int j = 0; j < k; j++){
+			for(int i = 0; i < m; i++){
+				weight_ys[j][i] = Choco.makeIntVar(("weight_y"+j)+i, 0, (slots_loads[j]));
+				model.addVariables(weight_ys[j][i]);
 			}
 		}
 		
@@ -132,26 +102,26 @@ public class WarehouseSolver {
 		// vincolo su y_i,j: La singola merce deve essere posizionata tutta
 		Constraint[] rows = new Constraint[m];
 		for(int i = 0; i < m; i++){
-			rows[i] = Choco.eq(Choco.sum(ys[i]), s[i]);
+			rows[i] = Choco.eq(Choco.sum(ys[i]), boxes_per_goods[i]);
 		}
 
 		model.addConstraints(rows);
 		
-		// vincolo sulla capacita` delle location sum_j ys[i][j]*b[i]
-		Constraint[] loc_cap = new Constraint[k];
+		// vincolo sul volume degli slot
+		Constraint[] slot_vols = new Constraint[k];
 		for(int j = 0; j < k; j++){
-			IntegerExpressionVariable [] inner = new IntegerExpressionVariable[k];
-			for(int i = 0; i < m; i++){
-				inner[j] = Choco.constant(0);
-			}
-			for(int i = 0; i < m; i++){
-				inner[j] = Choco.plus(inner[j], Choco.mult(ys[i][j], b[i]));
-			}
-			loc_cap[j] = Choco.leq(inner[j], Cap[j]);
+			slot_vols[j] = Choco.leq( Choco.sum(vol_ys[j]), slots_volumes[j]);
 		}
 		
-		model.addConstraints(loc_cap);
+		model.addConstraints(slot_vols);
 		
+		// vincolo sul volume degli slot
+		Constraint[] slot_loads = new Constraint[k];
+		for(int j = 0; j < k; j++){
+			slot_loads[j] = Choco.leq( Choco.sum(weight_ys[j]), slots_loads[j]);
+		}
+		
+		model.addConstraints(slot_loads);
 
 		//Our solver
 		Solver solver = new CPSolver();
@@ -160,6 +130,8 @@ public class WarehouseSolver {
 		solver.read(model);
 
 		ChocoLogging.setVerbosity(Verbosity.SEARCH);
+		
+		long tps = System.currentTimeMillis();
 		
 		//solve the problem
 		solver.solve();
@@ -171,9 +143,27 @@ public class WarehouseSolver {
 			}
 			System.out.println();
 		}
+		System.out.println();
 		
-		long tps = System.currentTimeMillis();
-		solver.solveAll();
+		//Print the vol_ys values
+		for(int j = 0; j < k; j++){
+			for(int i = 0; i < m; i++){
+				System.out.print(solver.getVar(vol_ys[j][i]).getVal()+" ");
+			}
+			System.out.println();
+		}
+		System.out.println();
+		
+		//Print the weight_ys values
+		for(int j = 0; j < k; j++){
+			for(int i = 0; i < m; i++){
+				System.out.print(solver.getVar(weight_ys[j][i]).getVal()+" ");
+			}
+			System.out.println();
+		}
+		
+		
+//		solver.solveAll();
 		System.out.println("tps nreines1 " + (System.currentTimeMillis() - tps) + " nbNode " + solver.getNodeCount());
 	
 	}
