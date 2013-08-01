@@ -47,9 +47,9 @@ public class WarehouseSolver {
 		String loads1 = new String();
 		String qt = new String();
 		for(int i = 0; i < m; i++) {
-			boxes_volumes[i] = 1 + (int)(Math.random() * ((60 - 1) + 1));
+			boxes_volumes[i] = 1 + (int)(Math.random() * ((20 - 1) + 1));
 			vols1 += Integer.toString(boxes_volumes[i]) + " ";
-			boxes_weights[i] = 1 + (int)(Math.random() * ((50 - 1) + 1));
+			boxes_weights[i] = 1 + (int)(Math.random() * ((10 - 1) + 1));
 			loads1 += Integer.toString(boxes_weights[i]) + " ";
 			boxes_per_goods[i] = 1 + (int)(Math.random() * ((5 - 1) + 1));
 			qt += Integer.toString(boxes_per_goods[i]) + " ";
@@ -81,22 +81,6 @@ public class WarehouseSolver {
 			}
 		}
 		
-		IntegerVariable[][] vol_ys = new IntegerVariable[k][m];
-		for(int j = 0; j < k; j++){
-			for(int i = 0; i < m; i++){
-				vol_ys[j][i] = Choco.makeIntVar(("vol_y"+j)+i, 0, (slots_volumes[j]));
-				model.addVariables(vol_ys[j][i]);
-			}
-		}
-		
-		IntegerVariable[][] weight_ys = new IntegerVariable[k][m];
-		for(int j = 0; j < k; j++){
-			for(int i = 0; i < m; i++){
-				weight_ys[j][i] = Choco.makeIntVar(("weight_y"+j)+i, 0, (slots_loads[j]));
-				model.addVariables(weight_ys[j][i]);
-			}
-		}
-		
 		//Constraints
 		
 		// vincolo su y_i,j: La singola merce deve essere posizionata tutta
@@ -110,7 +94,12 @@ public class WarehouseSolver {
 		// vincolo sul volume degli slot
 		Constraint[] slot_vols = new Constraint[k];
 		for(int j = 0; j < k; j++){
-			slot_vols[j] = Choco.leq( Choco.sum(vol_ys[j]), slots_volumes[j]);
+			IntegerExpressionVariable tmp = Choco.constant(0);
+
+			for(int i = 0; i < m; i++){
+				tmp = Choco.plus(tmp, Choco.mult(ys[i][j], boxes_volumes[i]));
+			}
+			slot_vols[j] = Choco.leq(tmp, slots_volumes[j]);
 		}
 		
 		model.addConstraints(slot_vols);
@@ -118,7 +107,12 @@ public class WarehouseSolver {
 		// vincolo sul volume degli slot
 		Constraint[] slot_loads = new Constraint[k];
 		for(int j = 0; j < k; j++){
-			slot_loads[j] = Choco.leq( Choco.sum(weight_ys[j]), slots_loads[j]);
+			IntegerExpressionVariable tmp = Choco.constant(0);
+
+			for(int i = 0; i < m; i++){
+				tmp = Choco.plus(tmp, Choco.mult(ys[i][j], boxes_weights[i]));
+			}
+			slot_loads[j] = Choco.leq(tmp, slots_loads[j]);
 		}
 		
 		model.addConstraints(slot_loads);
@@ -144,23 +138,6 @@ public class WarehouseSolver {
 			System.out.println();
 		}
 		System.out.println();
-		
-		//Print the vol_ys values
-		for(int j = 0; j < k; j++){
-			for(int i = 0; i < m; i++){
-				System.out.print(solver.getVar(vol_ys[j][i]).getVal()+" ");
-			}
-			System.out.println();
-		}
-		System.out.println();
-		
-		//Print the weight_ys values
-		for(int j = 0; j < k; j++){
-			for(int i = 0; i < m; i++){
-				System.out.print(solver.getVar(weight_ys[j][i]).getVal()+" ");
-			}
-			System.out.println();
-		}
 		
 		
 //		solver.solveAll();
