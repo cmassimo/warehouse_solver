@@ -43,7 +43,7 @@ public class WarehouseSolver {
 		int[] Cap = new int[]{5,5,5,5,5,5,5,5,5,5,5,5};
 		// unita` di prodotto disponibili
 		int[] s = new int[]{9,8,10,9,15};
-		// dimensione del singolo box di prodotto (in unita`)
+		// capacità del singolo box di prodotto (in unita`)
 		int[] b = new int[]{3,2,5,3,5};
 		
 		// penalita` per posizionamento location vicine
