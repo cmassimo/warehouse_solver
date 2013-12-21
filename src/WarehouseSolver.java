@@ -1,6 +1,3 @@
-import java.util.Arrays;
-import java.util.logging.Level;
-
 import choco.cp.model.CPModel;
 import choco.kernel.common.logging.ChocoLogging;
 import choco.kernel.common.logging.Verbosity;
@@ -13,14 +10,19 @@ import choco.kernel.solver.Solver;
 import choco.cp.solver.CPSolver;
 
 public class WarehouseSolver {
+	
+	WarehouseProblem problem;
 
-	public static void main(String[] args) {
+	public WarehouseSolver(int[] is) {
+		problem = new WarehouseProblem(is);
+	}
+
+	public SimulationResult solve() {
 		//constants of the problem:
 		
-		// numero di merci
-		int m = 5;
-		// numero di location disponibili
-		int k = 12;
+		int m = problem.goods_count;
+		int k = problem.locations_count;
+		
 		// capacita` delle location
 		int[] slots_volumes = new int[k];
 		int[] slots_loads = new int[k];
@@ -142,6 +144,8 @@ public class WarehouseSolver {
 		
 //		solver.solveAll();
 		System.out.println("tps nreines1 " + (System.currentTimeMillis() - tps) + " nbNode " + solver.getNodeCount());
+		
+		return new SimulationResult(solver.getNodeCount(), ((System.currentTimeMillis() - tps) / 1000.0));
 	
 	}
 
