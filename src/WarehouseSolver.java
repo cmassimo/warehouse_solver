@@ -10,7 +10,13 @@ import choco.kernel.model.constraints.Constraint;
 import choco.kernel.solver.ContradictionException;
 import choco.kernel.solver.Solution;
 import choco.kernel.solver.Solver;
+import choco.kernel.solver.variables.integer.IntDomainVar;
 import choco.cp.solver.CPSolver;
+import choco.cp.solver.search.integer.branching.AssignVar;
+import choco.cp.solver.search.integer.valiterator.DecreasingDomain;
+import choco.cp.solver.search.integer.valselector.MaxVal;
+import choco.cp.solver.search.integer.valselector.RandomIntValSelector;
+import choco.cp.solver.search.integer.varselector.MinDomain;
 
 public class WarehouseSolver {
 
@@ -202,6 +208,17 @@ public class WarehouseSolver {
 
 		//read the model
 		solver.read(model);
+		
+		// getting the vars from the solver
+		IntDomainVar[] solver_ys = new IntDomainVar[m*k];
+		for(int i = 0; i < m; i++){
+			for(int j = 0; j < k; j++){
+				solver_ys[i*k+j] = solver.getVar(ys[i][j]);
+			}
+		}
+		
+		solver.addGoal(new AssignVar(new MinDomain(solver, solver_ys), new MaxVal()));
+//		solver.addGoal(new AssignVar(new MinDomain(solver, solver_ys), new RandomIntValSelector()));
 
 //		ChocoLogging.setVerbosity(Verbosity.SEARCH);
 
