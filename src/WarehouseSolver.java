@@ -6,7 +6,6 @@ import choco.kernel.common.logging.Verbosity;
 import choco.kernel.model.Model;
 import choco.kernel.model.variables.integer.IntegerExpressionVariable;
 import choco.kernel.model.variables.integer.IntegerVariable;
-import choco.kernel.model.variables.set.SetVariable;
 import choco.Choco;
 import choco.Options;
 import choco.kernel.model.constraints.Constraint;
@@ -15,6 +14,7 @@ import choco.kernel.solver.Solution;
 import choco.kernel.solver.Solver;
 import choco.kernel.solver.variables.integer.IntDomainVar;
 import choco.cp.solver.CPSolver;
+import choco.cp.solver.search.integer.branching.AssignOrForbidIntVarVal;
 import choco.cp.solver.search.integer.branching.AssignVar;
 import choco.cp.solver.search.integer.valiterator.DecreasingDomain;
 import choco.cp.solver.search.integer.valselector.MaxVal;
@@ -50,9 +50,11 @@ public class WarehouseSolver {
 		String indexes = new String("\t\t");
 		for(int j = 0; j < k; j++) {
 			indexes += Integer.toString(j) + "\t";
-			slots_volumes[j] = 1 + (int)(Math.random() * 100);
+			//			slots_volumes[j] = 1 + (int)(Math.random() * 100);
+			slots_volumes[j] = 100 + j;
 			vols += Integer.toString(slots_volumes[j]) + "\t";
-			slots_loads[j] = 1 + (int)(Math.random() * 70);
+			//			slots_loads[j] = 1 + (int)(Math.random() * 70);
+			slots_loads[j] = 70 + j;
 			loads += Integer.toString(slots_loads[j]) + "\t";
 		}
 		System.out.println(indexes);
@@ -65,11 +67,14 @@ public class WarehouseSolver {
 		String loads1 = new String();
 		String qt = new String();
 		for(int i = 0; i < m; i++) {
-			boxes_volumes[i] = 1 + (int)(Math.random() * 20);
+			//			boxes_volumes[i] = 1 + (int)(Math.random() * 20);
+			boxes_volumes[i] = 20+i;
 			vols1 += Integer.toString(boxes_volumes[i]) + "\t";
-			boxes_weights[i] = 1 + (int)(Math.random() * 10);
+			//			boxes_weights[i] = 1 + (int)(Math.random() * 10);
+			boxes_weights[i] = 10+i;
 			loads1 += Integer.toString(boxes_weights[i]) + "\t";
-			boxes_per_goods[i] = 1 + (int)(Math.random() * 5);
+			//			boxes_per_goods[i] = 1 + (int)(Math.random() * 5);
+			boxes_per_goods[i] = 5+i;
 			qt += Integer.toString(boxes_per_goods[i]) + "\t";
 		}
 		System.out.println("Volumi box:\t" + vols1);
@@ -79,7 +84,7 @@ public class WarehouseSolver {
 
 		// Our model
 		Model model = new CPModel();
-		
+
 		// Variables
 
 		// y_i,j: unita` di prodotto i nella location j
@@ -99,15 +104,7 @@ public class WarehouseSolver {
 				model.addVariables(xs[i][j]);
 			}
 		}
-		
-		// s_i gli indici di location per ogni merce
-		
-//		SetVariable[] location_indexes = new SetVariable[m];
-//		for (int i = 0; i < m; i++) {
-//			location_indexes[i] = Choco.makeSetVar("s_" + i, 0, k-1, Options.V_NO_DECISION);
-//		}
-//		model.addVariables(location_indexes);
-		
+
 		// v_somma_i accumula la somma degli indici delle location utilizzate per la merce i.
 		IntegerVariable[] somme = new IntegerVariable[m];
 		for (int i = 0; i < m; i++) {
@@ -115,22 +112,14 @@ public class WarehouseSolver {
 			somme[i] = Choco.makeIntVar("v_somma_" + i, 0, k*k/2, Options.V_NO_DECISION);
 		}
 		model.addVariables(somme);
-		
-		
-		IntegerVariable[] minimi = new IntegerVariable[m];
-		for (int i = 0; i < m; i++) {
-			minimi[i] = Choco.makeIntVar("v_min_" + i, 0, k, Options.V_NO_DECISION);
-		}
-		model.addVariables(minimi);
-		
+
 		IntegerVariable[] cards = new IntegerVariable[m];
 		for (int i = 0; i < m; i++) {
-			cards[i] = Choco.makeIntVar("v_card_" + i, 0, k, Options.V_NO_DECISION);
+			cards[i] = Choco.makeIntVar("v_card_" + i, 1, k, Options.V_NO_DECISION);
 		}
 		model.addVariables(cards);
-		
 
-		
+
 		//Constraints
 
 		// vincolo su y_i_j: La singola merce deve essere posizionata tutta
@@ -140,29 +129,23 @@ public class WarehouseSolver {
 		}
 
 		model.addConstraints(rows);
-		
+
 		// vincolo su x_i_j: se y_i_j = 0 => x_i_j = 0 | se y_i_j > 0 => x_i_j = 1
 		for(int i = 0; i < m; i++){
 			for(int j = 0; j < k; j++){
 				model.addConstraints( Choco.ifOnlyIf(Choco.gt(ys[i][j], Choco.ZERO), Choco.eq(xs[i][j], Choco.ONE)) );
 			}
 		}
-		
+
 		// vincolo che accumula la somma degli indici delle location per la merce i
+		int[] coefficients = new int[k];
+		for(int j = 0; j < k; j++){
+			coefficients[j]=j;
+		}
+		
 		for(int i = 0; i < m; i++){
-//			IntegerExpressionVariable tmp = Choco.ZERO;
-//			IntegerExpressionVariable count = Choco.ZERO;
-			for(int j = 0; j < k; j++){
-				IntegerVariable jvar = Choco.constant(j);
-//
-				model.addConstraints( Choco.ifOnlyIf(Choco.eq(xs[i][j], Choco.ONE),
-						Choco.ifOnlyIf(Choco.leq(jvar, minimi[i]), Choco.eq(minimi[i], jvar))) );
-//				
-//				tmp = Choco.ifThenElse(Choco.eq(xs[i][j], Choco.ONE), Choco.plus(tmp, jvar), tmp);
-//				count = Choco.ifThenElse(Choco.eq(xs[i][j], Choco.ONE), Choco.plus(count, Choco.ONE), count);
-			}
-//			model.addConstraints(Choco.eq(somme[i], tmp));
-//			model.addConstraints(Choco.eq(cards[i], count));
+			model.addConstraint(Choco.eq(somme[i], Choco.scalar(xs[i], coefficients)));
+			model.addConstraint(Choco.eq(cards[i], Choco.sum(xs[i])));
 		}
 
 		// vincolo sul volume degli slot SUM(i, y_i_j*box_vol) <= slot_vol foreach j in k
@@ -191,47 +174,35 @@ public class WarehouseSolver {
 
 		model.addConstraints(slot_lds);		
 
-		// per ogni merce: disposizione in max 3 location, serve per contiguita` delle stesse ( 0 <= SUM(x_i_j) <= 3 Foreach merce i-esima)
-//		Constraint[] max_locations = new Constraint[m];
-//		
-//		IntegerExpressionVariable three = Choco.constant(3);
-//		
-//		for(int i = 0; i < m; i++){
-//			max_locations[i] = Choco.and(Choco.leq(Choco.ONE, Choco.sum(xs[i])), Choco.leq(Choco.sum(xs[i]), three));
-//		}
 
-//		model.addConstraints(max_locations);		
-		
 		// Funzione obiettivo, dichiaro una var intera con limiti assurdi e la marco come OBJ
-//		IntegerVariable z = Choco.makeIntVar("z", -1000, 1000, Options.V_OBJECTIVE);
-		
+		IntegerVariable z = Choco.makeIntVar("z", 0, 10000, Options.V_OBJECTIVE);
+
 		// L'espressione che modella la funzione obiettivo ovvero SUM(j, j*SUM(i, x_i_j)) da minimizzare.
 		// In italiano significa che penalizziamo le location man mano che crescono di indice, ovvero
 		// minimizziamo il numero di location usate e le manteniamo il piu` raggruppate possibile (non bastasse il gruppo di vincoli precedente). 
-//		IntegerExpressionVariable[] inner_sums = new IntegerExpressionVariable[k];
-//		for (int j = 0; j < k; j++) {
-//			IntegerVariable P1 = Choco.constant(1);
-//			IntegerVariable P2 = Choco.constant(1);
-//			IntegerExpressionVariable[] tmp = new IntegerExpressionVariable[m];
-//			for (int i = 0; i < m; i++) {	
-//				tmp[i] = Choco.plus(Choco.mult(P1, Choco.minus(somme[i], Choco.mult(minimi[i], cards[i]))), Choco.mult(P2, cards[i]));
-//			}
-//			inner_sums[j] = Choco.mult(j, Choco.sum(tmp));
-//		}
-//		
-//		
-//		
-//		model.addConstraints(Choco.eq(z, Choco.sum(tmp)));
-		
-		
-//		SUM ( P1*(v_somma - v_min*v_card) + P2*(v_card) ) 
-		
+
+		IntegerVariable P1 = Choco.constant(1);
+		IntegerVariable P2 = Choco.constant(5);
+		IntegerExpressionVariable[] tmp = new IntegerExpressionVariable[m];
+		for (int i = 0; i < m; i++) {
+			tmp[i] = Choco.plus(Choco.mult(Choco.div(somme[i], cards[i]), P1), Choco.mult(cards[i], P2));
+		}
+		//			inner_sums[j] = Choco.mult(j, Choco.sum(tmp));
+		//		}
+
+		model.addConstraints(Choco.eq(z, Choco.sum(tmp)));
+
+
+		//		SUM ( P1*(v_somma - v_min*v_card) + P2*(v_card) )
+		// SUM(P1*(v_somma/v_card) + P2*v_card)
+
 		//Our solver
 		Solver solver = new CPSolver();
 
 		//read the model
 		solver.read(model);
-		
+
 		// getting the vars from the solver
 		IntDomainVar[] solver_ys = new IntDomainVar[m*k];
 		for(int i = 0; i < m; i++){
@@ -239,11 +210,14 @@ public class WarehouseSolver {
 				solver_ys[i*k+j] = solver.getVar(ys[i][j]);
 			}
 		}
-		
-		solver.addGoal(new AssignVar(new MinDomain(solver, solver_ys), new MaxVal()));
-//		solver.addGoal(new AssignVar(new MinDomain(solver, solver_ys), new RandomIntValSelector()));
 
-		ChocoLogging.setVerbosity(Verbosity.SEARCH);
+		//		solver.addGoal(new AssignVar(new MinDomain(solver, solver_ys), new MaxVal()));
+		//		solver.addGoal(new AssignVar(new MinDomain(solver, solver_ys), new RandomIntValSelector()));
+
+		ChocoLogging.setVerbosity(Verbosity.SOLUTION);
+
+		//		solver.monitorFailLimit(true);
+		//		solver.setFailLimit(120000);
 
 		long tps = System.currentTimeMillis();
 
@@ -254,14 +228,15 @@ public class WarehouseSolver {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
-//		solver.minimize(false);
-		solver.solve();
 
-//		String solution = solver.solutionToString();
-//		
-//		System.out.println(solution);
-//		System.out.println();
+		//		solver.setTimeLimit(120000);
+		solver.minimize(false);
+		//		solver.solve();
+
+		//		String solution = solver.solutionToString();
+		//		
+		//		System.out.println(solution);
+		//		System.out.println();
 
 		System.out.println("Y vars:\n");
 		//Print the values
@@ -276,10 +251,10 @@ public class WarehouseSolver {
 			}
 		}
 		System.out.println("------\n");
-		
-//		int val1 = solver.getVar(z).getVal();
-//		String name1 = solver.getVar(z).getName();
-//		System.out.print(name1 + " (f.o.): " + val1 + "\n");
+
+		int val1 = solver.getVar(z).getVal();
+		String name1 = solver.getVar(z).getName();
+		System.out.print(name1 + " (f.o.): " + val1 + "\n");
 
 		System.out.println("X vars:\n");
 		//Print the values
@@ -294,31 +269,22 @@ public class WarehouseSolver {
 			}
 		}
 		System.out.println("------\n");
-		
+
 		System.out.println("somme vars:\n");
 		//Print the values
 		for(int i = 0; i < m; i++){
-				int val = solver.getVar(somme[i]).getVal();
-				String name = solver.getVar(somme[i]).getName();
-				System.out.print(name + ": " + val + "\n");
+			int val = solver.getVar(somme[i]).getVal();
+			String name = solver.getVar(somme[i]).getName();
+			System.out.print(name + ": " + val + "\n");
 		}
 		System.out.println("------\n");
-		
-		System.out.println("minimi vars:\n");
-		//Print the values
-		for(int i = 0; i < m; i++){
-				int val = solver.getVar(minimi[i]).getVal();
-				String name = solver.getVar(minimi[i]).getName();
-				System.out.print(name + ": " + val + "\n");
-		}
-		System.out.println("------\n");
-		
+
 		System.out.println("cards vars:\n");
 		//Print the values
 		for(int i = 0; i < m; i++){
-				int val = solver.getVar(cards[i]).getVal();
-				String name = solver.getVar(cards[i]).getName();
-				System.out.print(name + ": " + val + "\n");
+			int val = solver.getVar(cards[i]).getVal();
+			String name = solver.getVar(cards[i]).getName();
+			System.out.print(name + ": " + val + "\n");
 		}
 		System.out.println("------\n");
 
