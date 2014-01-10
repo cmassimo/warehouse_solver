@@ -9,7 +9,7 @@ public class WarehouseSimulator {
 		Simulation simulation = new Simulation();
 		
 		System.out.println("[WarehouseSimulator] Loading data file...");
-		simulation.load_from_file(args[0], args[1]);
+		simulation.load_from_file(args[0]);
 		
 		System.out.println("[WarehouseSimulator] Simulating...");
 		simulation.run();

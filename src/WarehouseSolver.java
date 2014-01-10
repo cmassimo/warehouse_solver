@@ -25,8 +25,8 @@ public class WarehouseSolver {
 
 	WarehouseProblem problem;
 
-	public WarehouseSolver(int[] is) {
-		problem = new WarehouseProblem(is);
+	public WarehouseSolver(WarehouseProblem p) {
+		problem = p;
 	}
 
 	public SimulationResult solve() {
@@ -36,50 +36,24 @@ public class WarehouseSolver {
 		int k = problem.locations_count;
 
 		// capacita` delle location
-		int[] slots_volumes = new int[k];
-		int[] slots_loads = new int[k];
+		int[] slots_volumes = problem.slots_volumes;
+		int[] slots_loads = problem.slots_loads;
 		// unita` di prodotto disponibili
-		int[] boxes_volumes = new int[m];
-		int[] boxes_weights = new int[m];
+		int[] boxes_volumes = problem.boxes_volumes;
+		int[] boxes_weights = problem.boxes_weights;
+		int[] boxes_per_goods = problem.boxes_per_goods;
 
-		int[] boxes_per_goods = new int[m];
-
-		// init volumi slot
-		String vols = new String();
-		String loads = new String();
-		String indexes = new String("\t\t");
-		for(int j = 0; j < k; j++) {
-			indexes += Integer.toString(j) + "\t";
-			//			slots_volumes[j] = 1 + (int)(Math.random() * 100);
-			slots_volumes[j] = 100 + j;
-			vols += Integer.toString(slots_volumes[j]) + "\t";
-			//			slots_loads[j] = 1 + (int)(Math.random() * 70);
-			slots_loads[j] = 70 + j;
-			loads += Integer.toString(slots_loads[j]) + "\t";
+		int[] coefficients = new int[k];
+		for(int j = 0; j < k; j++){
+			coefficients[j]=j;
 		}
-		System.out.println(indexes);
+		
 		System.out.println();
-		System.out.println("Volumi slot:\t" + vols);
-		System.out.println("Pesi slot:\t" + loads);
-
-		// init volumi slot
-		String vols1 = new String();
-		String loads1 = new String();
-		String qt = new String();
-		for(int i = 0; i < m; i++) {
-			//			boxes_volumes[i] = 1 + (int)(Math.random() * 20);
-			boxes_volumes[i] = 20+i;
-			vols1 += Integer.toString(boxes_volumes[i]) + "\t";
-			//			boxes_weights[i] = 1 + (int)(Math.random() * 10);
-			boxes_weights[i] = 10+i;
-			loads1 += Integer.toString(boxes_weights[i]) + "\t";
-			//			boxes_per_goods[i] = 1 + (int)(Math.random() * 5);
-			boxes_per_goods[i] = 5+i;
-			qt += Integer.toString(boxes_per_goods[i]) + "\t";
-		}
-		System.out.println("Volumi box:\t" + vols1);
-		System.out.println("Pesi box:\t" + loads1);
-		System.out.println("# box/merce:\t" + qt);
+		System.out.println("Volumi slot:\t" + Arrays.toString(slots_volumes));
+		System.out.println("Pesi slot:\t" + Arrays.toString(slots_loads));
+		System.out.println("Volumi box:\t" + Arrays.toString(boxes_volumes));
+		System.out.println("Pesi box:\t" + Arrays.toString(boxes_weights));
+		System.out.println("# box/merce:\t" + Arrays.toString(boxes_per_goods));
 		System.out.println();
 
 		// Our model
@@ -108,7 +82,6 @@ public class WarehouseSolver {
 		// v_somma_i accumula la somma degli indici delle location utilizzate per la merce i.
 		IntegerVariable[] somme = new IntegerVariable[m];
 		for (int i = 0; i < m; i++) {
-			// TODO verificare upper bound su libro di analisi
 			somme[i] = Choco.makeIntVar("v_somma_" + i, 0, k*k/2, Options.V_NO_DECISION);
 		}
 		model.addVariables(somme);
@@ -138,11 +111,6 @@ public class WarehouseSolver {
 		}
 
 		// vincolo che accumula la somma degli indici delle location per la merce i
-		int[] coefficients = new int[k];
-		for(int j = 0; j < k; j++){
-			coefficients[j]=j;
-		}
-		
 		for(int i = 0; i < m; i++){
 			model.addConstraint(Choco.eq(somme[i], Choco.scalar(xs[i], coefficients)));
 			model.addConstraint(Choco.eq(cards[i], Choco.sum(xs[i])));
@@ -152,7 +120,6 @@ public class WarehouseSolver {
 		Constraint[] slot_vols = new Constraint[k];
 		for(int j = 0; j < k; j++){
 			IntegerExpressionVariable[] tmp = new IntegerExpressionVariable[m];
-
 			for(int i = 0; i < m; i++){
 				tmp[i] = Choco.mult(ys[i][j], boxes_volumes[i]);
 			}
@@ -174,7 +141,6 @@ public class WarehouseSolver {
 
 		model.addConstraints(slot_lds);		
 
-
 		// Funzione obiettivo, dichiaro una var intera con limiti assurdi e la marco come OBJ
 		IntegerVariable z = Choco.makeIntVar("z", 0, 10000, Options.V_OBJECTIVE);
 
@@ -186,10 +152,8 @@ public class WarehouseSolver {
 		IntegerVariable P2 = Choco.constant(5);
 		IntegerExpressionVariable[] tmp = new IntegerExpressionVariable[m];
 		for (int i = 0; i < m; i++) {
-			tmp[i] = Choco.plus(Choco.mult(Choco.div(somme[i], cards[i]), P1), Choco.mult(cards[i], P2));
+			tmp[i] = Choco.plus(Choco.mult(somme[i], P1), Choco.mult(cards[i], P2));
 		}
-		//			inner_sums[j] = Choco.mult(j, Choco.sum(tmp));
-		//		}
 
 		model.addConstraints(Choco.eq(z, Choco.sum(tmp)));
 
@@ -215,21 +179,16 @@ public class WarehouseSolver {
 		//		solver.addGoal(new AssignVar(new MinDomain(solver, solver_ys), new RandomIntValSelector()));
 
 		ChocoLogging.setVerbosity(Verbosity.SOLUTION);
-
-		//		solver.monitorFailLimit(true);
-		//		solver.setFailLimit(120000);
-
 		long tps = System.currentTimeMillis();
 
 		//solve the problem
 		try {
 			solver.propagate();
 		} catch (ContradictionException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 
-		//		solver.setTimeLimit(120000);
+		solver.setTimeLimit(120000);
 		solver.minimize(false);
 		//		solver.solve();
 
@@ -238,7 +197,7 @@ public class WarehouseSolver {
 		//		System.out.println(solution);
 		//		System.out.println();
 
-		System.out.println("Y vars:\n");
+		System.out.println("\n\nY vars:");
 		//Print the values
 		for(int i = 0; i < m; i++){
 			for(int j = 0; j < k; j++){
@@ -256,7 +215,7 @@ public class WarehouseSolver {
 		String name1 = solver.getVar(z).getName();
 		System.out.print(name1 + " (f.o.): " + val1 + "\n");
 
-		System.out.println("X vars:\n");
+		System.out.println("X vars:");
 		//Print the values
 		for(int i = 0; i < m; i++){
 			for(int j = 0; j < k; j++){
@@ -270,7 +229,7 @@ public class WarehouseSolver {
 		}
 		System.out.println("------\n");
 
-		System.out.println("somme vars:\n");
+		System.out.println("somme vars:");
 		//Print the values
 		for(int i = 0; i < m; i++){
 			int val = solver.getVar(somme[i]).getVal();
@@ -279,7 +238,7 @@ public class WarehouseSolver {
 		}
 		System.out.println("------\n");
 
-		System.out.println("cards vars:\n");
+		System.out.println("cards vars:");
 		//Print the values
 		for(int i = 0; i < m; i++){
 			int val = solver.getVar(cards[i]).getVal();
@@ -294,6 +253,4 @@ public class WarehouseSolver {
 		return new SimulationResult(solver.getNodeCount(), ((System.currentTimeMillis() - tps) / 1000.0	));
 
 	}
-
-
 }

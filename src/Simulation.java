@@ -7,31 +7,60 @@ import java.io.IOException;
 
 public class Simulation {
 	
-	int [][] data;
-	SimulationResult[] results;
+	WarehouseProblem wp;
+	SimulationResult results;
 	
 	public Simulation() {};
 
-	public void load_from_file(String filename, String count) {
-		int problems_count = Integer.parseInt(count);
+	public void load_from_file(String filename) {
+
+		wp = new WarehouseProblem();
+		
 		try {
 			FileReader file = new FileReader(filename);
 			BufferedReader br = new BufferedReader(file);
 
-			data = new int[problems_count][2];
-			String line;
-			int i = 0;
-
-			while ((line = br.readLine()) != null) {
-				System.out.println(line);
-				String[] values = line.split(",");
-
-				data[i][0] = Integer.parseInt(values[0]);
-				data[i][1] = Integer.parseInt(values[1]);
-
-				i++;
+			String line = br.readLine();
+			String[] values = line.split(",");
+			wp.goods_count = Integer.parseInt(values[0]);
+			wp.locations_count = Integer.parseInt(values[1]);
+			
+			wp.slots_volumes = new int[wp.locations_count];
+			wp.slots_loads = new int[wp.locations_count];
+			wp.boxes_volumes = new int[wp.goods_count];
+			wp.boxes_weights = new int[wp.goods_count];
+			wp.boxes_per_goods = new int[wp.goods_count];
+			
+			line = br.readLine();
+			values = line.split(",");
+			for (int i = 0; i < wp.locations_count; i++) {
+				wp.slots_volumes[i]=Integer.parseInt(values[i]);
 			}
-
+			
+			line = br.readLine();
+			values = line.split(",");
+			for (int i = 0; i < wp.locations_count; i++) {
+				wp.slots_loads[i]=Integer.parseInt(values[i]);
+			}
+			
+			line = br.readLine();
+			values = line.split(",");
+			for (int i = 0; i < wp.goods_count; i++) {
+				wp.boxes_volumes[i]=Integer.parseInt(values[i]);
+			}
+			
+			line = br.readLine();
+			values = line.split(",");
+			for (int i = 0; i < wp.goods_count; i++) {
+				wp.boxes_weights[i]=Integer.parseInt(values[i]);
+			}
+			
+			line = br.readLine();
+			values = line.split(",");
+			for (int i = 0; i < wp.goods_count; i++) {
+				wp.boxes_per_goods[i]=Integer.parseInt(values[i]);
+			}
+			
 			br.close();
 
 		}
@@ -46,22 +75,21 @@ public class Simulation {
 	}
 
 	public void run() {
-		results = new SimulationResult[data.length];
+		
+		results = new SimulationResult();
 
-		for (int i = 0; i < data.length; i++) {
-			WarehouseSolver solver = new WarehouseSolver(data[i]);
-			results[i] = solver.solve();
-		}
+
+		WarehouseSolver solver = new WarehouseSolver(wp);
+		results = solver.solve();
+
 
 		try {
 			FileWriter out = new FileWriter("results.csv");
 			BufferedWriter bw = new BufferedWriter(out);
-
-			for (int i = 0; i < results.length; i++) {
-				String line = results[i].node_count + "," + results[i].elapsed_seconds;
-				bw.write(line, 0, line.length());
-				bw.newLine();
-			}
+				
+			String line = results.node_count + "," + results.elapsed_seconds;
+			bw.write(line, 0, line.length());
+			bw.newLine();
 			
 			bw.close();
 			
@@ -69,6 +97,5 @@ public class Simulation {
 			System.out.println("[Simulation] Error: I/O error writing results.csv.");
 			e.printStackTrace();
 		}
-
 	}
 }
