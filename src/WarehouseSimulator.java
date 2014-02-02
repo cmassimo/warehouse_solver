@@ -1,10 +1,7 @@
 public class WarehouseSimulator {
 	
 	// args[0] data file name (csv con 2 colonne intere)
-	// args[1] numero di righe del csv
-	// esempio di invocazione: java Warehousesimulator data.csv 3
-	// se lo lanci da eclipse metti i parametri nella configurazione di lancio dal
-	// menu` a tendina del bottone Run
+	// esempio di invocazione: java Warehousesimulator data.csv
 	public static void main(String[] args) {
 		Simulation simulation = new Simulation();
 		

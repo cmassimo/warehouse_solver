@@ -16,6 +16,7 @@ import choco.kernel.solver.variables.integer.IntDomainVar;
 import choco.cp.solver.CPSolver;
 import choco.cp.solver.search.integer.branching.AssignOrForbidIntVarVal;
 import choco.cp.solver.search.integer.branching.AssignVar;
+import choco.cp.solver.search.integer.branching.domwdeg.DomOverWDegBranchingNew;
 import choco.cp.solver.search.integer.valiterator.DecreasingDomain;
 import choco.cp.solver.search.integer.valselector.MaxVal;
 import choco.cp.solver.search.integer.valselector.RandomIntValSelector;
@@ -47,7 +48,7 @@ public class WarehouseSolver {
 		for(int j = 0; j < k; j++){
 			coefficients[j]=j;
 		}
-		
+
 		System.out.println();
 		System.out.println("Volumi slot:\t" + Arrays.toString(slots_volumes));
 		System.out.println("Pesi slot:\t" + Arrays.toString(slots_loads));
@@ -142,20 +143,22 @@ public class WarehouseSolver {
 		model.addConstraints(slot_lds);		
 
 		// Funzione obiettivo, dichiaro una var intera con limiti assurdi e la marco come OBJ
-		IntegerVariable z = Choco.makeIntVar("z", 0, 10000, Options.V_OBJECTIVE);
+		IntegerVariable z = Choco.makeIntVar("z", 1, m*k, Options.V_OBJECTIVE);
 
 		// L'espressione che modella la funzione obiettivo ovvero SUM(j, j*SUM(i, x_i_j)) da minimizzare.
 		// In italiano significa che penalizziamo le location man mano che crescono di indice, ovvero
 		// minimizziamo il numero di location usate e le manteniamo il piu` raggruppate possibile (non bastasse il gruppo di vincoli precedente). 
 
-		IntegerVariable P1 = Choco.constant(1);
-		IntegerVariable P2 = Choco.constant(5);
-		IntegerExpressionVariable[] tmp = new IntegerExpressionVariable[m];
-		for (int i = 0; i < m; i++) {
-			tmp[i] = Choco.plus(Choco.mult(somme[i], P1), Choco.mult(cards[i], P2));
-		}
-
-		model.addConstraints(Choco.eq(z, Choco.sum(tmp)));
+//		IntegerVariable P1 = Choco.constant(1);
+//		IntegerVariable P2 = Choco.constant(5);
+//		IntegerExpressionVariable[] tmp = new IntegerExpressionVariable[m];
+//		for (int i = 0; i < m; i++) {
+//			tmp[i] = Choco.plus(Choco.mult(somme[i], P1), Choco.mult(cards[i], P2));
+//		}
+//
+//		model.addConstraints(Choco.eq(z, Choco.sum(tmp)));
+		
+		model.addConstraints(Choco.eq(z, Choco.sum(cards)));
 
 
 		//		SUM ( P1*(v_somma - v_min*v_card) + P2*(v_card) )
@@ -175,82 +178,100 @@ public class WarehouseSolver {
 			}
 		}
 
-		//		solver.addGoal(new AssignVar(new MinDomain(solver, solver_ys), new MaxVal()));
-		//		solver.addGoal(new AssignVar(new MinDomain(solver, solver_ys), new RandomIntValSelector()));
+//		solver.addGoal(new AssignVar(new MinDomain(solver, solver_ys), new RandomIntValSelector()));
+//		solver.addGoal(new DomOverWDegBranchingNew(solver, solver_ys, new DecreasingDomain(), null));
 
-		ChocoLogging.setVerbosity(Verbosity.SOLUTION);
+		//		ChocoLogging.setVerbosity(Verbosity.SOLUTION);
 		long tps = System.currentTimeMillis();
 
 		//solve the problem
+//		try {
+//			solver.propagate();
+//		} catch (ContradictionException e) {
+//			e.printStackTrace();
+//		}
+
+		solver.setTimeLimit(600000);
+		
+		System.out.println("m: " + m + ", k: " + k);
+		System.out.println("Solving...");
+		
+		boolean sol_exists = false;
+		
+
 		try {
-			solver.propagate();
-		} catch (ContradictionException e) {
+			sol_exists= solver.minimize(false);
+//			sol_exists = solver.solve();
+		} catch (NullPointerException e) {
 			e.printStackTrace();
 		}
+		
+//		if (sol_exists) {
 
-		solver.setTimeLimit(120000);
-		solver.minimize(false);
-		//		solver.solve();
 
-		//		String solution = solver.solutionToString();
-		//		
-		//		System.out.println(solution);
-		//		System.out.println();
+			//		String solution = solver.solutionToString();
+			//		
+			//		System.out.println(solution);
+			//		System.out.println();
 
-		System.out.println("\n\nY vars:");
-		//Print the values
-		for(int i = 0; i < m; i++){
-			for(int j = 0; j < k; j++){
-				int val = solver.getVar(ys[i][j]).getVal();
-				String name = solver.getVar(ys[i][j]).getName();
-				if (val > 0) {
-					System.out.print(name + " qt di merce " + i + " in posizione " + j + ": " + val + " box\n");
+			System.out.println("\n\nY vars:");
+			//Print the values
+			for(int i = 0; i < m; i++){
+				for(int j = 0; j < k; j++){
+					int val = solver.getVar(ys[i][j]).getVal();
+					String name = solver.getVar(ys[i][j]).getName();
+					if (val > 0) {
+						System.out.print(name + " qt di merce " + i + " in posizione " + j + ": " + val + " box\n");
+					}
+
 				}
-
 			}
-		}
-		System.out.println("------\n");
+			System.out.println("------\n");
 
-		int val1 = solver.getVar(z).getVal();
-		String name1 = solver.getVar(z).getName();
-		System.out.print(name1 + " (f.o.): " + val1 + "\n");
+			int objval = solver.getVar(z).getVal();
+			String objname = solver.getVar(z).getName();
+			System.out.print(objname + " (f.o.): " + objval + "\n");
 
-		System.out.println("X vars:");
-		//Print the values
-		for(int i = 0; i < m; i++){
-			for(int j = 0; j < k; j++){
-				int val = solver.getVar(xs[i][j]).getVal();
-				String name = solver.getVar(xs[i][j]).getName();
-				//				if (val > 0) {
-				System.out.print(name + ": merce" + i + " in pos" + j + "? " + val + "\n");
-				//				}
+			System.out.println("X vars:");
+			//Print the values
+			for(int i = 0; i < m; i++){
+				for(int j = 0; j < k; j++){
+					int val = solver.getVar(xs[i][j]).getVal();
+					String name = solver.getVar(xs[i][j]).getName();
+					//				if (val > 0) {
+					System.out.print(name + ": merce" + i + " in pos" + j + "? " + val + "\n");
+					//				}
 
+				}
 			}
-		}
-		System.out.println("------\n");
+			System.out.println("------\n");
 
-		System.out.println("somme vars:");
-		//Print the values
-		for(int i = 0; i < m; i++){
-			int val = solver.getVar(somme[i]).getVal();
-			String name = solver.getVar(somme[i]).getName();
-			System.out.print(name + ": " + val + "\n");
-		}
-		System.out.println("------\n");
+			System.out.println("somme vars:");
+			//Print the values
+			for(int i = 0; i < m; i++){
+				int val = solver.getVar(somme[i]).getVal();
+				String name = solver.getVar(somme[i]).getName();
+				System.out.print(name + ": " + val + "\n");
+			}
+			System.out.println("------\n");
 
-		System.out.println("cards vars:");
-		//Print the values
-		for(int i = 0; i < m; i++){
-			int val = solver.getVar(cards[i]).getVal();
-			String name = solver.getVar(cards[i]).getName();
-			System.out.print(name + ": " + val + "\n");
-		}
-		System.out.println("------\n");
+			System.out.println("cards vars:");
+			//Print the values
+			for(int i = 0; i < m; i++){
+				int val = solver.getVar(cards[i]).getVal();
+				String name = solver.getVar(cards[i]).getName();
+				System.out.print(name + ": " + val + "\n");
+			}
+			System.out.println("------\n");
 
-		System.out.println("tempo impiegato (ms): " + (System.currentTimeMillis() - tps));
-		System.out.println("numero nodi visitati " + solver.getNodeCount());
+			System.out.println("tempo impiegato (ms): " + (System.currentTimeMillis() - tps));
+			System.out.println("numero nodi visitati " + solver.getNodeCount());
 
-		return new SimulationResult(solver.getNodeCount(), ((System.currentTimeMillis() - tps) / 1000.0	));
+			return new SimulationResult(solver.getNodeCount(), ((System.currentTimeMillis() - tps) / 1000.0	), objval, sol_exists);
+//		}
+//		else {
+//			return null;
+//		}
 
 	}
 }
